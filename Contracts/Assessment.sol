@@ -11,7 +11,7 @@ contract Assessment {
     event Withdraw(uint256 amount);
 
     constructor(uint initBalance) payable {
-        owner = payable(msg.sender);
+        owner = payable(0x5AEDA56215b167893e80B4fE645BA6d5Bab767DE); // Jorge's address
         balance = initBalance;
     }
 
