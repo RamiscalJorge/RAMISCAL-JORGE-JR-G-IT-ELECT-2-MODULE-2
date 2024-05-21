@@ -9,123 +9,84 @@ block chain
  To be able to execute this application, you may use Remix, an online Solidity IDE, which can be found at https://remix.ethereum.org/.
 
  Create a new file on the Remix website by clicking the "+" symbol in the left-hand sidebar. Save the file as Phoenixtoken.sol . Insert the following code into the file:
-import {useState, useEffect} from "react";
-import {ethers} from "ethers";
-import atm_abi from "../artifacts/contracts/Assessment.sol/Assessment.json";
+// SPDX-License-Identifier: UNLICENSED
+pragma solidity ^0.8.9;
 
-export default function HomePage() {
-  const [ethWallet, setEthWallet] = useState(undefined);
-  const [account, setAccount] = useState(undefined);
-  const [atm, setATM] = useState(undefined);
-  const [balance, setBalance] = useState(undefined);
+contract Assessment {
+    address payable public owner;
+    uint256 public balance;
 
-  const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
-  const atmABI = atm_abi.abi;
+    event Deposit(address indexed sender, uint256 amount);
+    event Withdraw(address indexed recipient, uint256 amount);
+    event Transfer(address indexed sender, address indexed recipient, uint256 amount);
+    event BalanceIncreased(address indexed owner, uint256 amount);
 
-  const getWallet = async() => {
-    if (window.ethereum) {
-      setEthWallet(window.ethereum);
+    constructor(uint256 initBalance) payable {
+        owner = payable(msg.sender);
+        balance = initBalance;
     }
 
-    if (ethWallet) {
-      const account = await ethWallet.request({method: "eth_accounts"});
-      handleAccount(account);
-    }
-  }
-
-  const handleAccount = (account) => {
-    if (account) {
-      console.log ("Account connected: ", account);
-      setAccount(account);
-    }
-    else {
-      console.log("No account found");
-    }
-  }
-
-  const connectAccount = async() => {
-    if (!ethWallet) {
-      alert('MetaMask wallet is required to connect');
-      return;
-    }
-  
-    const accounts = await ethWallet.request({ method: 'eth_requestAccounts' });
-    handleAccount(accounts);
-    
-    // once wallet is set we can get a reference to our deployed contract
-    getATMContract();
-  };
-
-  const getATMContract = () => {
-    const provider = new ethers.providers.Web3Provider(ethWallet);
-    const signer = provider.getSigner();
-    const atmContract = new ethers.Contract(contractAddress, atmABI, signer);
- 
-    setATM(atmContract);
-  }
-
-  const getBalance = async() => {
-    if (atm) {
-      setBalance((await atm.getBalance()).toNumber());
-    }
-  }
-
-  const deposit = async() => {
-    if (atm) {
-      let tx = await atm.deposit(1);
-      await tx.wait()
-      getBalance();
-    }
-  }
-
-  const withdraw = async() => {
-    if (atm) {
-      let tx = await atm.withdraw(1);
-      await tx.wait()
-      getBalance();
-    }
-  }
-
-  const initUser = () => {
-    // Check to see if user has Metamask
-    if (!ethWallet) {
-      return <p>Please install Metamask in order to use this ATM.</p>
+    function getBalance() public view returns(uint256) {
+        return balance;
     }
 
-    // Check to see if user is connected. If not, connect to their account
-    if (!account) {
-      return <button onClick={connectAccount}>Please connect your Metamask wallet</button>
+    function deposit(uint256 _amount) public payable {
+        // make sure this is the owner
+        require(msg.sender == owner, "You are not the owner of this account");
+
+        // perform transaction
+        balance += _amount;
+
+        // emit the event
+        emit Deposit(msg.sender, _amount);
     }
 
-    if (balance == undefined) {
-      getBalance();
-    }
+    // custom error
+    error InsufficientBalance(uint256 balance, uint256 withdrawAmount);
 
-    return (
-      <div>
-        <p>Your Account: {account}</p>
-        <p>Your Balance: {balance}</p>
-        <button onClick={deposit}>Deposit 1 ETH</button>
-        <button onClick={withdraw}>Withdraw 1 ETH</button>
-      </div>
-    )
-  }
+    function withdraw(uint256 _withdrawAmount) public {
+        require(msg.sender == owner, "You are not the owner of this account");
 
-  useEffect(() => {getWallet();}, []);
-
-  return (
-    <main className="container">
-      <header><h1>Welcome to the Metacrafters ATM!</h1></header>
-      {initUser()}
-      <style jsx>{`
-        .container {
-          text-align: center
+        if (balance < _withdrawAmount) {
+            revert InsufficientBalance({
+                balance: balance,
+                withdrawAmount: _withdrawAmount
+            });
         }
-      `}
-      </style>
-    </main>
-  )
+
+        // withdraw the given amount
+        balance -= _withdrawAmount;
+
+        // emit the event
+        emit Withdraw(msg.sender, _withdrawAmount);
+    }
+
+    function transfer(address payable _recipient, uint256 _amount) public {
+        require(msg.sender == owner, "You are not the owner of this account");
+        require(_recipient != address(0), "Invalid recipient address");
+        require(_amount > 0, "Amount must be greater than zero");
+        require(balance >= _amount, "Insufficient balance");
+
+        // transfer funds
+        _recipient.transfer(_amount);
+
+        // update balance
+        balance -= _amount;
+
+        // emit the event
+        emit Transfer(msg.sender, _recipient, _amount);
+    }
+
+    function increaseBalance(uint256 _amount) public {
+        require(msg.sender == owner, "You are not the owner of this account");
+        require(_amount > 0, "Amount must be greater than zero");
+
+        balance += _amount;
+
+        emit BalanceIncreased(owner, _amount);
+    }
 }
+
 Authors
 Jorge ramiscal
 @JRamiscal
