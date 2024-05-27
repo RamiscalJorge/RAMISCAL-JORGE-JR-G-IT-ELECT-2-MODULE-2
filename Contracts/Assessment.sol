@@ -1,60 +1,62 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.9;
 
-//import "hardhat/console.sol";
-
 contract Assessment {
     address payable public owner;
     uint256 public balance;
 
-    event Deposit(uint256 amount);
-    event Withdraw(uint256 amount);
+    event Deposit(address indexed from, uint256 amount);
+    event Withdraw(address indexed to, uint256 amount);
 
-    constructor(uint initBalance) payable {
-        owner = payable(msg.sender);
-        balance = initBalance;
+    modifier onlyOwner() {
+        require(msg.sender == owner, "You are not the owner");
+        _;
     }
 
-    function getBalance() public view returns(uint256){
+    error InsufficientBalance(uint256 balance, uint256 withdrawAmount);
+
+    constructor() payable {
+        owner = payable(msg.sender);
+        balance = msg.value;
+    }
+
+    function getBalance() external view returns (uint256) {
         return balance;
     }
 
-    function deposit(uint256 _amount) public payable {
-        uint _previousBalance = balance;
+    function deposit() external payable onlyOwner {
+        require(msg.value > 0, "Deposit amount must be greater than zero");
 
-        // make sure this is the owner
-        require(msg.sender == owner, "You are not the owner of this account");
+        balance += msg.value;
+        emit Deposit(msg.sender, msg.value);
 
-        // perform transaction
-        balance += _amount;
-
-        // assert transaction completed successfully
-        assert(balance == _previousBalance + _amount);
-
-        // emit the event
-        emit Deposit(_amount);
+        assert(balance == address(this).balance);
     }
 
-    // custom error
-    error InsufficientBalance(uint256 balance, uint256 withdrawAmount);
-
-    function withdraw(uint256 _withdrawAmount) public {
-        require(msg.sender == owner, "You are not the owner of this account");
-        uint _previousBalance = balance;
+    function withdraw(uint256 _withdrawAmount) external onlyOwner {
         if (balance < _withdrawAmount) {
-            revert InsufficientBalance({
-                balance: balance,
-                withdrawAmount: _withdrawAmount
-            });
+            revert InsufficientBalance(balance, _withdrawAmount);
         }
 
-        // withdraw the given amount
         balance -= _withdrawAmount;
+        (bool success, ) = owner.call{value: _withdrawAmount}("");
+        require(success, "Transfer failed");
 
-        // assert the balance is correct
-        assert(balance == (_previousBalance - _withdrawAmount));
+        emit Withdraw(owner, _withdrawAmount);
 
-        // emit the event
-        emit Withdraw(_withdrawAmount);
+        assert(balance == address(this).balance);
+    }
+
+    // This function is called for plain Ether transfers, i.e., for every call with empty calldata.
+    receive() external payable {
+        balance += msg.value;
+        emit Deposit(msg.sender, msg.value);
+    }
+
+    // This function is called when no other function matches.
+    // It must be marked `payable` to accept Ether.
+    fallback() external payable {
+        balance += msg.value;
+        emit Deposit(msg.sender, msg.value);
     }
 }
