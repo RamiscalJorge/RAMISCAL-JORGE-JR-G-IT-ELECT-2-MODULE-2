@@ -47,7 +47,7 @@ contract Assessment {
         assert(balance == address(this).balance);
     }
 
-    // This function is called for plain Ether transfers, i.e., for every call with empty calldata.
+    // This function is called for plain Ether transfers for every call with empty calldata.
     receive() external payable {
         balance += msg.value;
         emit Deposit(msg.sender, msg.value);
