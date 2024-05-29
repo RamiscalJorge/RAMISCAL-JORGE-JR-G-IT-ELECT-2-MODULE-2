@@ -9,6 +9,7 @@ export default function HomePage() {
   const [balance, setBalance] = useState(undefined);
   const [depositAmount, setDepositAmount] = useState('');
   const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [loading, setLoading] = useState(false);
 
   const contractAddress = "0x5FbDB2315678afecb367f032d93F642f64180aa3";
   const atmABI = atm_abi.abi;
@@ -67,10 +68,13 @@ export default function HomePage() {
   const deposit = async () => {
     if (atm) {
       try {
+        setLoading(true);
         const tx = await atm.deposit({ value: ethers.utils.parseEther(depositAmount) });
         await tx.wait();
+        setLoading(false);
         getBalance();
       } catch (error) {
+        setLoading(false);
         console.error("Error making deposit: ", error);
       }
     }
@@ -79,14 +83,25 @@ export default function HomePage() {
   const withdraw = async () => {
     if (atm) {
       try {
+        setLoading(true);
         const tx = await atm.withdraw(ethers.utils.parseEther(withdrawAmount));
         await tx.wait();
+        setLoading(false);
         getBalance();
       } catch (error) {
+        setLoading(false);
         console.error("Error making withdrawal: ", error);
       }
     }
   };
+
+  const refreshBalance = () => {
+    getBalance();
+  };
+
+  useEffect(() => {
+    getWallet();
+  }, []);
 
   const initUser = () => {
     if (!ethWallet) {
@@ -127,9 +142,10 @@ export default function HomePage() {
             />
             <button
               onClick={deposit}
-              className="py-4 px-4 bg-[#2596be] text-white border:none rounded-md mx-2 hover:bg-red-500 hover:text-white"
+              className={`py-4 px-4 bg-[#2596be] text-white border:none rounded-md mx-2 hover:bg-red-500 hover:text-white ${loading && 'opacity-50 cursor-not-allowed'}`}
+              disabled={loading}
             >
-              Deposit ETH
+              {loading ? 'Processing...' : 'Deposit ETH'}
             </button>
             <input
               type="number"
@@ -140,19 +156,22 @@ export default function HomePage() {
             />
             <button
               onClick={withdraw}
-              className="py-4 px-4 bg-[#2596be] text-white border:none rounded-md  hover:bg-red-500 hover:text-white"
+              className={`py-4 px-4 bg-[#2596be] text-white border:none rounded-md  hover:bg-red-500 hover:text-white ${loading && 'opacity-50 cursor-not-allowed'}`}
+              disabled={loading}
             >
-              Withdraw ETH
+              {loading ? 'Processing...' : 'Withdraw ETH'}
+            </button>
+            <button
+              onClick={refreshBalance}
+              className="py-4 px-4 bg-[#2596be] text-white border:none rounded-md mx-2 mt-4 hover:bg-red-500 hover:text-white"
+            >
+              Refresh Balance
             </button>
           </div>
         </div>
       </>
     );
   };
-
-  useEffect(() => {
-    getWallet();
-  }, []);
 
   return (
     <>
